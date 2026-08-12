@@ -4,21 +4,33 @@
 
 apc 由一组结构化的 Markdown 文件组成，作为提示词框架，为 AI Agent 提供持久、可审查的项目交接协议。它不依赖守护进程、数据库或账号，仅使用提示词 + 本地文档。
 
+**本仓库是 apc 的开发工作区**：作为 apc 的开发者，我们在外层目录开发知识库阅读工具（`apc-visual/`），为后续深度优化 apc 本体做准备。`apc/` 作为只读子模块引入，避免开发时提示词注入。
+
 ## 仓库结构
 
 ```text
-apc/            # apc 框架核心（所有核心文件）
+apc/            # apc 框架核心（git 子模块，只读引用，独立仓库）
 ├── README.md          # 英文说明
 ├── README.zh-CN.md    # 中文说明
 ├── docs/              # 文档（如 INSTALL.md）
 ├── examples/          # 示例项目
 └── tools/             # 辅助工具
+apc-visual/     # APC 知识库可视化阅读工具（本工作区产物）
+├── server.js          # Node 服务器（动态 API + SSE 热更新）
+├── index.html         # 前端入口
+├── main.js / content.js / markdown.js / data.js   # 前端逻辑
+└── styles.css         # 样式
+.apc/           # 本工作区知识库（遵循 apc 协议）
+├── manifest.md        # 项目锚点（使命/栈/不变量/高风险区）
+├── workflow.md        # 开发协议（开发流程源）
+├── rules.md           # 有证据的规则与死路
+├── decisions.md       # 已采纳决策与根因
+├── memory.md          # 当前状态与最近会话
+├── history.md         # 归档
+└── garden.md          # 知识库维护
 README.md       # 本文件（项目根说明）
+参考1.md        # apc.md v2.0 架构设计（优化方向参考）
 ```
-
-> **为什么 apc 放在子目录？**
->
-> 作为 apc 的开发者，若直接在 `apc/` 目录内启动 agent 开发，会导致提示词注入风险。因此将 apc 核心放在子目录，开发工作在外层目录进行，避免 agent 上下文被框架自身污染。
 
 ## 工作原理
 
@@ -52,6 +64,13 @@ apc 致力于通过以下理念提升开发效率：
 - 新项目接入：[安装说明](./apc/docs/INSTALL.md)
 - 查看示例：[`examples/notch/`](./apc/examples/notch/)
 - 详细文档：[apc 中文说明](./apc/README.zh-CN.md)
+
+## 本工作区使用
+
+1. **初始化知识库**：本仓库已按 apc init 协议在根目录创建 `.apc/`（manifest/workflow/memory/rules/decisions/history/garden）
+2. **启动阅读工具**：`node apc-visual/server.js` 后访问 `http://localhost:3000`
+3. **Agent 入口**：`AGENTS.md` 路由到根目录 `.apc/`，按 `.apc/workflow.md` 执行开发协议
+4. **维护 apc 子模块**：进入 `apc/` 内独立操作（`git push origin main` 等），根仓库操作不影响其内部
 
 ## 目标与方向
 
