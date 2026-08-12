@@ -1,6 +1,11 @@
 # 知识库运行时数据（apc 生成）
 apc/.apc/
 
+# 根目录知识库与文档：仅 README 参与提交，其余 md 不纳入大仓库
+/.apc/
+/*.md
+!/README.md
+
 # 依赖
 node_modules/
 
