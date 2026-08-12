@@ -4,7 +4,7 @@
 
 ## Mission
 
-- **Name**: APC 工具集大项目（APC + APC tools）
+- **Name**: APC 工具集大项目（apc-tools）
 - **Positioning**: 以 apc 原版框架为核心，开发配套工具（apc-visual 阅读工具等），并持续优化 apc 本体
 - **Goals**:
   - 大项目 = apc 原版 + 配套工具集（apc-visual 为第一个工具）
@@ -47,8 +47,8 @@ Changing an invariant requires a recorded root cause in
 ## Project structure
 
 ```text
-d:\dev\apc-md\          ← 根 git 仓库（开发工作区）
-├── apc\                ← APC 框架核心（独立 git 子模块，只读引用）
+d:\dev\apc-md\          ← apc-tools 根 git 仓库（开发工作区）
+├── apc\                ← APC 框架核心（独立 git 子模块，只读引用，remote=tk-wxy/apc.md.git）
 ├── apc-visual\         ← 知识库可视化阅读工具（本工作区产物）
 ├── .apc\               ← 本工作区知识库（manifest/rules/decisions/memory...）
 ├── .gitignore
@@ -61,7 +61,8 @@ d:\dev\apc-md\          ← 根 git 仓库（开发工作区）
 
 - 启动阅读工具：`node apc-visual/server.js`（或 `apc-visual/start.bat`）
 - 打开浏览器：`start http://localhost:3000`
-- 推送 apc 子模块：`cd apc && git push origin main`
+- 推送 apc 子模块：`cd apc && git push origin main`（推 `apc.md.git`）
+- 推送大仓库：`git push origin master`（按 R2 核对是否需双仓推送）
 - 结构检查：`python apc/tools/check_apc.py`
 - 提交根仓库：`git add . && git commit`
 

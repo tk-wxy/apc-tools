@@ -13,18 +13,23 @@ Rules:
 
 ## §0 Snapshot
 
-- **Status**: 大项目定位已确认（apc 原版 + 配套工具集）；知识库初始化完成；待配置 GitHub 大仓库并首次推送
-- **Latest progress**: 固化双仓库提交协议（apc 改动推双仓、仅工具改动只推大仓）到 manifest 不变量与 decisions §2
-- **Next step**: 确定大项目名 → 配置 GitHub 大仓库 → 首次提交推送（严格按双仓库协议核对）
-- **Known issues**: 根仓库尚无远程 remote，首次推送需用户先建仓库并授权
+- **Status**: 大项目定位已确认（apc 原版 + 配套工具集，项目名 **apc-tools**）；知识库初始化完成；GitHub 大仓库已建（apc-tools.git）；待配置 remote 并首次推送
+- **Latest progress**: 固化双仓库提交协议（apc 改动推双仓、仅工具改动只推大仓）到 manifest 不变量与 decisions §2；确认 apc 核心仓库为 tk-wxy/apc.md.git
+- **Next step**: 更新 apc 子模块 remote → 配置大仓库 remote → 首次提交推送（严格按双仓库协议核对）
+- **Known issues**: 根仓库尚无远程 remote；apc 子模块 remote 仍是旧地址 apc.git（需改为 apc.md.git）
 
 ## §0A Recent sessions
+
+### Session 2026-08-13 01:35 - 项目名与仓库地址确认
+
+- 项目名选定：**apc-tools**（GitHub 大仓库 `tk-wxy/apc-tools.git` 已建，空仓库）
+- apc 核心仓库确认：`tk-wxy/apc.md.git`（与旧 apc.git 内容一致，HEAD=b80bc0e，为同一仓库重命名）
+- 待办：更新 apc 子模块 remote、配置大仓库 remote、首次推送
 
 ### Session 2026-08-13 01:30 - 大项目定位确认与双仓库协议
 
 - 确认大项目 = apc 原版 + 配套工具集（apc-visual 为第一个工具），工具开发与 apc 优化并行
 - 固化提交规则：apc 改动推双仓（apc 原仓库 + 大仓库）；仅工具改动只推大仓库
-- 根仓库无 remote；apc 子模块指向 `github.com/tk-wxy/apc.git`
 - 待办：起大项目名、配置 GitHub、首次推送
 
 ### Session 2026-08-13 01:00 - 工作区 git 化与知识库初始化
