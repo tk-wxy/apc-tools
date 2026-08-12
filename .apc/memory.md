@@ -13,12 +13,18 @@ Rules:
 
 ## §0 Snapshot
 
-- **Status**: 大项目定位已确认（apc 原版 + 配套工具集，项目名 **apc-tools**）；知识库初始化完成；GitHub 大仓库已建（apc-tools.git）；待配置 remote 并首次推送
-- **Latest progress**: 固化双仓库提交协议（apc 改动推双仓、仅工具改动只推大仓）到 manifest 不变量与 decisions §2；确认 apc 核心仓库为 tk-wxy/apc.md.git
-- **Next step**: 更新 apc 子模块 remote → 配置大仓库 remote → 首次提交推送（严格按双仓库协议核对）
-- **Known issues**: 根仓库尚无远程 remote；apc 子模块 remote 仍是旧地址 apc.git（需改为 apc.md.git）
+- **Status**: 大项目 apc-tools 已建立并首次推送 GitHub（master）；双仓库协议已固化；apc 子模块与 .gitmodules 均指向 apc.md.git
+- **Latest progress**: 确认项目名 apc-tools、apc 核心仓库 tk-wxy/apc.md.git；配置大仓库 remote（HTTPS）、apc 子模块 remote 到 apc.md.git；提交并推送知识库与 .gitmodules 修正
+- **Next step**: 后续开发按双仓库协议推进（apc 改动推双仓、仅工具改动只推大仓）
+- **Known issues**: 本机 SSH 对 github.com 主机密钥未信任，SSH 推送会因确认提示阻塞，统一改用 HTTPS（凭据管理器认证）
 
 ## §0A Recent sessions
+
+### Session 2026-08-13 01:45 - apc-tools 仓库初始化完成
+
+- 项目名 apc-tools 固化到 manifest/memory；GitHub 大仓库 apc-tools.git 配置 HTTPS remote 并首次推送 master 成功（f8b3d10）
+- apc 子模块 remote 与 .gitmodules 均更新为 https://github.com/tk-wxy/apc.md.git 并推送（2caa56c）
+- 本机 SSH 主机密钥未信任导致推送阻塞，统一改用 HTTPS 认证
 
 ### Session 2026-08-13 01:35 - 项目名与仓库地址确认
 
