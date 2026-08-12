@@ -4,15 +4,16 @@
 
 ## Mission
 
-- **Name**: APC 开发工作区（APC knowledge base visualizer）
-- **Positioning**: 为 APC 框架开发可视化阅读工具（apc-visual），并持续优化 APC 本体
+- **Name**: APC 工具集大项目（APC + APC tools）
+- **Positioning**: 以 apc 原版框架为核心，开发配套工具（apc-visual 阅读工具等），并持续优化 apc 本体
 - **Goals**:
-  - 为 apc-visual 阅读工具提供稳定、动态的知识库可视化浏览能力
-  - 以工具开发为切入点，深度理解并优化 APC 框架本体
-  - 沉淀 APC 开发过程中的规则、决策与状态
+  - 大项目 = apc 原版 + 配套工具集（apc-visual 为第一个工具）
+  - 在优化 apc 的同时，为 apc 生态开发可视化/知识工具
+  - 通过双仓库提交流程，保持 apc 原版独立演进、大项目聚合工具
 - **Non-goals**:
-  - 不修改 `apc/` 子模块内的框架核心文件（保持其独立仓库纯净）
+  - 不把 apc 框架并入大仓库（保持其独立仓库纯净与独立发布）
   - 不改变 APC 框架的语义与协议
+  - 不因工具改动污染 apc 原版提交
 
 ## Locked stack
 
@@ -31,6 +32,10 @@ Changing an invariant requires a recorded root cause in
 - apc-visual 通过 API（`/api/meta`、`/api/content`）+ SSE（`/events`）动态读取知识库，不做静态构建
 - 知识库内容以 `.apc/` 为单一事实来源（source of truth）
 - 外层工作区与 apc 框架本身通过"子模块边界"隔离，避免提示词注入
+- **双仓库提交协议**：提交前必须先分析改动归属
+  - apc 有改动 → 推进 apc 原仓库，同时推进大仓库
+  - 仅工具/大仓库改动 → 只推进大仓库
+  - 此规则不可出错，每次提交推送前必须核对
 
 ## High-risk zones
 

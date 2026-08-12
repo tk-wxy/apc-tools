@@ -13,19 +13,25 @@ Rules:
 
 ## §0 Snapshot
 
-- **Status**: 初始化完成；apc-visual 阅读工具基础版已就绪，待深化
-- **Latest progress**: 根仓库 git 化完成，`apc/` 转为独立子模块；`.apc/` 知识库已按 apc init 协议初始化
-- **Next step**: 评估并深化 apc-visual 阅读工具（对照参考1.md 的受控记忆/低 Token 设计）
-- **Known issues**: 无（尚未深入工具验证）
+- **Status**: 大项目定位已确认（apc 原版 + 配套工具集）；知识库初始化完成；待配置 GitHub 大仓库并首次推送
+- **Latest progress**: 固化双仓库提交协议（apc 改动推双仓、仅工具改动只推大仓）到 manifest 不变量与 decisions §2
+- **Next step**: 确定大项目名 → 配置 GitHub 大仓库 → 首次提交推送（严格按双仓库协议核对）
+- **Known issues**: 根仓库尚无远程 remote，首次推送需用户先建仓库并授权
 
 ## §0A Recent sessions
+
+### Session 2026-08-13 01:30 - 大项目定位确认与双仓库协议
+
+- 确认大项目 = apc 原版 + 配套工具集（apc-visual 为第一个工具），工具开发与 apc 优化并行
+- 固化提交规则：apc 改动推双仓（apc 原仓库 + 大仓库）；仅工具改动只推大仓库
+- 根仓库无 remote；apc 子模块指向 `github.com/tk-wxy/apc.git`
+- 待办：起大项目名、配置 GitHub、首次推送
 
 ### Session 2026-08-13 01:00 - 工作区 git 化与知识库初始化
 
 - 将根目录初始化为 git 仓库，`apc/` 通过 `git submodule absorbgitdirs` 转为独立子模块（指向 origin/main），未改动 apc 内容
 - 按 apc init 协议创建根目录 `.apc/`：manifest、workflow、memory、rules、decisions、history、garden
 - 明确项目定位：为 apc 开发可视化阅读工具（apc-visual），为深度优化 apc 本体做准备
-- 下一步：评估 apc-visual 现状，对照参考1.md v2.0 设计深化阅读工具
 
 ## Pointers
 

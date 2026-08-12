@@ -13,6 +13,7 @@ relevant or high-risk.
 | ID | Summary | Section | High-risk |
 |---|---|---|---|
 | R1 | 不修改 apc/ 子模块框架核心 | Core | yes |
+| R2 | 双仓库提交协议（apc 改动推双仓，仅工具改动只推大仓） | Core | yes |
 
 ## Rules
 
@@ -23,6 +24,13 @@ relevant or high-risk.
   - Evidence: 用户明确要求"注意不要更改 apc"；git submodule absorbgitdirs 已验证子模块独立
   - Last verified: 2026-08-13
   - Status: active
+
+- [x] R2: 提交推送前先分析改动归属。apc 有改动 → 推进 apc 原仓库 + 大仓库；仅工具/大仓库改动 → 只推大仓库
+  - Scope: 整个大项目（根仓库 + apc 子模块）
+  - Evidence: 用户明确确认"apc 更改提交推到原 apc 仓库同时也提交整个大仓库，若 apc 未更改只提交大仓库"
+  - Last verified: 2026-08-13
+  - Status: active
+  - 参见 decisions.md §2
 
 ### {{HIGH_RISK_AREAS}}
 
