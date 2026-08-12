@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APC 知识库浏览器</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">APC</span>
+    <span class="tagline">基于 Markdown 的 AI Agent 持久项目上下文</span>
+  </div>
+  <div class="trust-legend">
+    <span class="legend-item"><span class="dot dot-high"></span>高信任</span>
+    <span class="legend-item"><span class="dot dot-low"></span>低信任</span>
+    <span class="legend-item"><span class="dot dot-forensics"></span>取证用</span>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- 左侧：结构图 -->
+  <section class="panel structure-panel" id="structure-panel">
+    <div class="panel-header">
+      <h2>知识库结构</h2>
+      <button class="collapse-btn" data-panel="structure-panel" title="折叠/展开" aria-label="折叠/展开">−</button>
+    </div>
+    <div class="panel-body" id="structure-body">
+      <div id="structure-graph"></div>
+      <p class="hint">点击节点查看对应文件</p>
+    </div>
+  </section>
+
+  <!-- 中间：文件树 -->
+  <section class="panel tree-panel" id="tree-panel">
+    <div class="panel-header">
+      <h2>文件浏览器</h2>
+      <button class="collapse-btn" data-panel="tree-panel" title="折叠/展开" aria-label="折叠/展开">−</button>
+    </div>
+    <div class="panel-body" id="tree-body">
+      <ul id="file-tree" class="file-tree"></ul>
+    </div>
+  </section>
+
+  <!-- 右侧：内容预览 -->
+  <section class="panel content-panel">
+    <div id="content-header" class="content-header"></div>
+    <article id="content-body" class="content-body"></article>
+  </section>
+</main>
+
+<script src="markdown.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

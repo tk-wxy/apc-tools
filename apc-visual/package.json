@@ -1,0 +1,13 @@
+{
+  "name": "apc-visual",
+  "version": "1.0.0",
+  "description": "APC 知识库可视化浏览器（动态 API + SSE 热更新）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}
