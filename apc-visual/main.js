@@ -244,6 +244,65 @@
     });
   }
 
+  /* ===== 主题与设置 ===== */
+  const THEME_KEY = 'apc-visual-theme';
+  const themeOptions = document.getElementById('theme-options');
+
+  // 读取本地存储的主题偏好（默认跟随系统）
+  function getSavedTheme() {
+    try {
+      return localStorage.getItem(THEME_KEY) || 'system';
+    } catch (e) {
+      return 'system';
+    }
+  }
+
+  // 应用主题：设置 data-theme 属性（light 不设值即走 :root 默认）
+  function applyTheme(value) {
+    document.documentElement.dataset.theme = value;
+    // 高亮当前选中项
+    document.querySelectorAll('.theme-option').forEach(opt => {
+      opt.classList.toggle('active', opt.dataset.themeValue === value);
+    });
+  }
+
+  // 保存偏好并应用
+  function setTheme(value) {
+    applyTheme(value);
+    try {
+      localStorage.setItem(THEME_KEY, value);
+    } catch (e) {
+      // 忽略存储失败
+    }
+  }
+
+  // 主题切换事件
+  themeOptions.addEventListener('click', (e) => {
+    const btn = e.target.closest('.theme-option');
+    if (!btn) return;
+    setTheme(btn.dataset.themeValue);
+  });
+
+  // 设置菜单开合
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsMenu = document.getElementById('settings-menu');
+
+  settingsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    settingsMenu.classList.toggle('open');
+  });
+
+  // 点击菜单外关闭
+  document.addEventListener('click', (e) => {
+    if (!settingsMenu.classList.contains('open')) return;
+    if (!settingsMenu.contains(e.target)) {
+      settingsMenu.classList.remove('open');
+    }
+  });
+
+  // 初始化主题
+  applyTheme(getSavedTheme());
+
   /* 初始化 */
   setupCollapse();
   loadMeta();

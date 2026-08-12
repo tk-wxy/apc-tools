@@ -12,10 +12,42 @@
     <span class="logo">APC</span>
     <span class="tagline">基于 Markdown 的 AI Agent 持久项目上下文</span>
   </div>
-  <div class="trust-legend">
-    <span class="legend-item"><span class="dot dot-high"></span>高信任</span>
-    <span class="legend-item"><span class="dot dot-low"></span>低信任</span>
-    <span class="legend-item"><span class="dot dot-forensics"></span>取证用</span>
+  <div class="topbar-right">
+    <div class="settings-wrap">
+      <button class="settings-btn" id="settings-btn" title="设置" aria-label="设置">
+        <span class="gear">⚙</span>
+        <span>设置</span>
+      </button>
+      <div class="settings-menu" id="settings-menu">
+        <!-- 主题设置 -->
+        <div class="settings-section">
+          <div class="settings-label">界面主题</div>
+          <div class="theme-options" id="theme-options">
+            <button class="theme-option" data-theme-value="light">
+              <span>☀️ 浅色</span>
+              <span class="t-desc">明亮界面</span>
+            </button>
+            <button class="theme-option" data-theme-value="dark">
+              <span>🌙 深色</span>
+              <span class="t-desc">暗色界面</span>
+            </button>
+            <button class="theme-option" data-theme-value="system">
+              <span>🖥️ 系统</span>
+              <span class="t-desc">跟随系统</span>
+            </button>
+          </div>
+        </div>
+        <!-- 可信度图例 -->
+        <div class="settings-section">
+          <div class="settings-label">可信度图例</div>
+          <div class="trust-legend">
+            <span class="legend-item"><span class="dot dot-high"></span>高信任</span>
+            <span class="legend-item"><span class="dot dot-low"></span>低信任</span>
+            <span class="legend-item"><span class="dot dot-forensics"></span>取证用</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </header>
 
