@@ -16,3 +16,10 @@ Thumbs.db
 # 编辑器
 .vscode/
 .idea/
+
+# apc-visual 运行时配置与测试产物
+apc-visual/.apc-config.json
+*.test.log
+apc-visual-test.log
+test-content.json
+test-dirs.json

@@ -12,6 +12,22 @@
     <span class="logo">APC</span>
     <span class="tagline">基于 Markdown 的 AI Agent 持久项目上下文</span>
   </div>
+  <div class="dir-wrap" id="dir-wrap">
+    <button class="dir-btn" id="dir-btn" title="切换知识库目录">
+      <span class="dir-icon">📚</span>
+      <span class="dir-name" id="dir-name">加载中…</span>
+      <span class="dir-caret">▾</span>
+    </button>
+    <div class="dir-menu" id="dir-menu">
+      <div class="dir-menu-header">知识库目录</div>
+      <div class="dir-list" id="dir-list"></div>
+      <div class="dir-add">
+        <input type="text" id="dir-input" placeholder="输入项目路径（含 .apc）" autocomplete="off" spellcheck="false">
+        <button id="dir-add-btn" title="添加目录">＋</button>
+      </div>
+      <p class="dir-hint">支持指向项目根目录或直接指向 .apc 目录</p>
+    </div>
+  </div>
   <div class="topbar-right">
     <div class="settings-wrap">
       <button class="settings-btn" id="settings-btn" title="设置" aria-label="设置">
@@ -75,10 +91,34 @@
     </div>
   </section>
 
-  <!-- 右侧：内容预览 -->
+  <!-- 右侧：内容预览 / 编辑器 -->
   <section class="panel content-panel">
     <div id="content-header" class="content-header"></div>
     <article id="content-body" class="content-body"></article>
+    <!-- 分屏编辑器：左侧实时预览（成品）+ 右侧草稿编辑 -->
+    <div id="editor-split" class="editor-split" hidden>
+      <div class="editor-pane">
+        <div class="editor-pane-header">
+          <span>👁 成品预览 <span class="editor-file-name" id="editor-file-name"></span></span>
+          <span class="editor-pane-badge">实时渲染 · 只读</span>
+        </div>
+        <div id="editor-preview" class="editor-preview content-body"></div>
+      </div>
+      <div class="editor-pane">
+        <div class="editor-pane-header">
+          <span>✏️ Raw 编辑</span>
+          <span class="editor-pane-badge" id="editor-chars">0 字</span>
+        </div>
+        <textarea id="editor" class="editor" spellcheck="false" placeholder="在此输入 Markdown 草稿，左侧实时预览…"></textarea>
+      </div>
+    </div>
+    <div id="editor-bar" class="editor-bar" hidden>
+      <span class="editor-status" id="editor-status">编辑模式</span>
+      <div class="editor-actions">
+        <button id="editor-cancel" class="btn btn-ghost">取消</button>
+        <button id="editor-save" class="btn btn-primary">💾 保存（覆盖此文件）</button>
+      </div>
+    </div>
   </section>
 </main>
 
