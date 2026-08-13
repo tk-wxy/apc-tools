@@ -16,26 +16,37 @@ const BASE = path.join(ROOT, '..');
 const CONFIG_FILE = path.join(ROOT, '.apc-config.json');
 const PORT = process.env.PORT || 3000;
 
-/* ---------- 当前知识库目录 ---------- */
+/* ---------- 当前知识库目录 ----------
+   APC_ROOT = 项目根目录；APC_DIR = .apc 知识库目录（可能为 null）。
+   两者均由 resolveProject(input) 归一化得到：无论用户选根目录还是 .apc 目录，
+   都解析为 { root, apcDir }，再统一读取 root + .apc 下的所有 md。 */
+let APC_ROOT = null;
 let APC_DIR = null;
 
-function defaultApcDir() {
-  // 1) 读取配置文件记住的目录
+function defaultProject() {
+  // 1) 配置文件记住的目录
   try {
     const cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
-    if (cfg.current && fs.existsSync(cfg.current)) return cfg.current;
+    if (cfg.current && fs.existsSync(cfg.current)) {
+      const p = resolveProject(cfg.current);
+      if (p) return p;
+    }
   } catch (e) {}
-  // 2) 默认 apc/.apc
-  const p = path.join(BASE, 'apc', '.apc');
-  if (fs.existsSync(p)) return p;
+  // 2) 大项目自身（BASE 含 .apc）
+  const baseProj = resolveProject(BASE);
+  if (baseProj) return baseProj;
   // 3) 任意扫描到的第一个 .apc
   const dirs = scanApcDirs();
-  return dirs.length ? dirs[0].path : null;
+  if (dirs.length) {
+    const p = resolveProject(dirs[0].path);
+    if (p) return p;
+  }
+  return { root: BASE, apcDir: null };
 }
 
 function saveConfig() {
   try {
-    const cfg = { current: APC_DIR, custom: getCustomDirs() };
+    const cfg = { current: APC_DIR || APC_ROOT, custom: getCustomDirs() };
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf-8');
   } catch (e) {
     console.warn('⚠ 保存配置失败:', e.message);
@@ -94,37 +105,47 @@ function scanApcDirs() {
   return results;
 }
 
-/* 解析用户输入的路径：允许直接指向 .apc 或项目根目录 */
-function resolveApcPath(input) {
+/* 解析用户输入路径，归一化为 { root, apcDir }：
+   - 选中项目根目录（内含 .apc）  -> root=选中, apcDir=选中/.apc
+   - 选中 .apc 目录本身            -> root=外层, apcDir=选中
+   - 既无 .apc 子目录也不是 .apc   -> root=选中, apcDir=null（全部归入「其他」） */
+function resolveProject(input) {
   if (!input) return null;
-  let p = input.trim();
-  try { p = path.resolve(p); } catch (e) { return null; }
+  let p;
+  try { p = path.resolve(input.trim()); } catch (e) { return null; }
   if (!fs.existsSync(p)) return null;
-  const stat = fs.statSync(p);
-  if (stat.isFile()) return null;
-  // 若指向项目根目录，自动拼接 .apc
-  if (path.basename(p) !== '.apc') {
-    const sub = path.join(p, '.apc');
-    if (fs.existsSync(sub) && fs.statSync(sub).isDirectory()) p = sub;
+  let stat;
+  try { stat = fs.statSync(p); } catch (e) { return null; }
+  if (!stat.isDirectory()) return null;
+
+  const sub = path.join(p, '.apc');
+  if (fs.existsSync(sub) && fs.statSync(sub).isDirectory()) {
+    return { root: p, apcDir: sub };
   }
-  return fs.existsSync(p) && fs.statSync(p).isDirectory() ? p : null;
+  if (path.basename(p) === '.apc') {
+    return { root: path.dirname(p), apcDir: p };
+  }
+  return { root: p, apcDir: null };
 }
 
 /* ---------- 启动前检查 ---------- */
 function checkEnvironment() {
   console.log('── APC 知识库热读取/热编辑服务器 ──');
   console.log(`  工作目录: ${ROOT}`);
-  if (!APC_DIR) {
-    console.warn('\n⚠ 未找到任何知识库目录 (.apc)');
-    console.warn('  请在 apc-visual 界面顶部选择或添加一个含 .apc 的目录\n');
+  if (!APC_ROOT) {
+    console.warn('\n⚠ 未找到任何知识库目录');
+    console.warn('  请在 apc-visual 界面顶部选择或添加一个项目目录\n');
     return false;
   }
-  const count = fs.existsSync(APC_DIR)
-    ? fs.readdirSync(APC_DIR).filter(f => f.endsWith('.md')).length
-    : 0;
-  console.log(`  知识库目录: ${APC_DIR}`);
-  console.log(`  ✓ 共 ${count} 个 .md 文件`);
-  return count > 0;
+  const apcCount = (APC_DIR && fs.existsSync(APC_DIR))
+    ? fs.readdirSync(APC_DIR).filter(f => f.endsWith('.md')).length : 0;
+  const rootCount = fs.existsSync(APC_ROOT)
+    ? fs.readdirSync(APC_ROOT, { withFileTypes: true })
+        .filter(e => e.isFile() && e.name.toLowerCase().endsWith('.md')).length : 0;
+  console.log(`  项目根目录: ${APC_ROOT}`);
+  if (APC_DIR) console.log(`  .apc 目录:  ${APC_DIR}`);
+  console.log(`  ✓ 根目录 ${rootCount} 个 md · .apc ${apcCount} 个 md`);
+  return (apcCount + rootCount) > 0;
 }
 
 /* 元数据模板：id -> 描述信息（人工维护） */
@@ -160,68 +181,110 @@ const GRAPH_TEMPLATE = [
 ];
 
 /* ---------- 动态读取 ---------- */
+/* .apc 目录下所有 md（核心 + 扩展） */
 function listApcFiles() {
   if (!APC_DIR || !fs.existsSync(APC_DIR)) return [];
   try {
     return fs.readdirSync(APC_DIR).filter(f => f.endsWith('.md'));
   } catch (e) {
-    console.error('读取知识库目录失败:', e.message);
+    console.error('读取 .apc 目录失败:', e.message);
     return [];
   }
 }
 
-/* 文件相对工具目录的展示路径 */
-function relPath(name) {
-  return APC_DIR ? path.relative(ROOT, path.join(APC_DIR, name)) : name;
+/* 项目根目录顶层 md（不递归进子目录，.apc 由 listApcFiles 单独处理） */
+function listRootFiles() {
+  if (!APC_ROOT || !fs.existsSync(APC_ROOT)) return [];
+  try {
+    return fs.readdirSync(APC_ROOT, { withFileTypes: true })
+      .filter(e => e.isFile() && e.name.toLowerCase().endsWith('.md'))
+      .map(e => e.name);
+  } catch (e) {
+    console.error('读取根目录失败:', e.message);
+    return [];
+  }
+}
+
+/* 文件相对项目根目录的展示路径（root 文件显示为 README.md，.apc 文件显示为 .apc/manifest.md） */
+function relPath(abs) {
+  if (!APC_ROOT) return abs;
+  const r = path.relative(APC_ROOT, abs);
+  return r || path.basename(abs);
 }
 
 function buildFiles() {
-  const existing = listApcFiles();
+  const apcExisting = listApcFiles();
+  const rootExisting = listRootFiles();
+  const known = new Set(Object.values(META_TEMPLATE).map(t => t.name));
   const files = [];
+
+  // 1) .apc 核心文件 -> core
   for (const id of Object.keys(META_TEMPLATE)) {
     const t = META_TEMPLATE[id];
-    if (existing.includes(t.name)) {
+    if (apcExisting.includes(t.name)) {
       files.push({
         id,
         name: t.name,
-        path: relPath(t.name),
+        path: relPath(path.join(APC_DIR, t.name)),
         role: t.role,
         trust: t.trust,
         trustNote: t.trustNote,
-        group: 'core'
+        group: 'core',
+        loc: 'apc'
       });
     }
   }
-  // 目录中存在但模板未定义的额外文件 → 归入「其他 md」分组
-  const known = new Set(Object.values(META_TEMPLATE).map(t => t.name));
-  existing.forEach(f => {
+  // 2) .apc 中非核心 md -> other（loc=apc）
+  apcExisting.forEach(f => {
     if (!known.has(f)) {
       files.push({
-        id: 'extra-' + f.replace(/\.md$/, ''),
+        id: 'apc-' + f,
         name: f,
-        path: relPath(f),
+        path: relPath(path.join(APC_DIR, f)),
         role: '扩展文件',
         trust: 'low',
         trustNote: '未在核心模板中定义',
-        group: 'other'
+        group: 'other',
+        loc: 'apc'
       });
     }
+  });
+  // 3) 根目录 md（含与核心同名的非 .apc 文件）-> other（loc=root）
+  rootExisting.forEach(f => {
+    files.push({
+      id: 'root-' + f,
+      name: f,
+      path: relPath(path.join(APC_ROOT, f)),
+      role: known.has(f) ? '根目录文档（与核心同名，归入其他）' : '根目录文档',
+      trust: 'low',
+      trustNote: '项目根目录 md',
+      group: 'other',
+      loc: 'root'
+    });
   });
   return files;
 }
 
 function buildGraph() {
-  const existing = new Set(listApcFiles());
+  const list = listApcFiles();
+  if (!list.length) return [];
+  const existing = new Set(list);
   return GRAPH_TEMPLATE.filter(item =>
     item.arrow || existing.has(item.name)
   );
 }
 
+/* 按 loc 选择文件所在基目录：apc -> APC_DIR，root -> APC_ROOT */
+function fileBase(loc) {
+  return loc === 'apc' ? APC_DIR : APC_ROOT;
+}
+
 function readContent(id) {
-  const files = buildFiles();
-  const f = files.find(x => x.id === id);
+  const f = buildFiles().find(x => x.id === id);
   if (!f) return null;
-  const fp = path.join(APC_DIR, f.name);
+  const base = fileBase(f.loc);
+  if (!base) return null;
+  const fp = path.join(base, f.name);
   if (!fs.existsSync(fp)) return null;
   try {
     return fs.readFileSync(fp, 'utf-8');
@@ -232,10 +295,11 @@ function readContent(id) {
 }
 
 function writeContent(id, content) {
-  const files = buildFiles();
-  const f = files.find(x => x.id === id);
+  const f = buildFiles().find(x => x.id === id);
   if (!f) return { ok: false, error: 'not found' };
-  const fp = path.join(APC_DIR, f.name);
+  const base = fileBase(f.loc);
+  if (!base) return { ok: false, error: 'no base dir' };
+  const fp = path.join(base, f.name);
   try {
     fs.writeFileSync(fp, content, 'utf-8');
     return { ok: true };
@@ -253,31 +317,37 @@ function broadcast(type, payload) {
   sseClients.forEach(res => { try { res.write(data); } catch (e) {} });
 }
 
-/* 监听当前 .apc 目录变化（目录切换时重建） */
-let watcher = null;
-function stopWatcher() {
-  if (watcher) { try { watcher.close(); } catch (e) {} watcher = null; }
+/* 监听根目录与 .apc 目录变化（目录切换时重建） */
+let watchers = [];
+function stopWatchers() {
+  watchers.forEach(w => { try { w.close(); } catch (e) {} });
+  watchers = [];
 }
-function startWatcher() {
-  stopWatcher();
-  if (!APC_DIR || !fs.existsSync(APC_DIR)) {
-    console.warn('⚠ 无法监听目录变化: 知识库目录不存在');
-    return;
-  }
+function watchDir(dir) {
+  if (!dir || !fs.existsSync(dir)) return;
   let debounce = null;
   try {
-    watcher = fs.watch(APC_DIR, (event, filename) => {
-      if (!filename || !filename.endsWith('.md')) return;
+    watchers.push(fs.watch(dir, (event, filename) => {
+      if (!filename || !filename.toLowerCase().endsWith('.md')) return;
       clearTimeout(debounce);
       debounce = setTimeout(() => {
-        console.log(`[watch] ${event}: ${filename}`);
+        console.log(`[watch] ${event}: ${path.basename(dir)}/${filename}`);
         broadcast('files-changed', { file: filename });
       }, 200);
-    });
-    console.log('  ✓ 目录监听已启用: ' + APC_DIR);
+    }));
   } catch (e) {
-    console.warn('⚠ 无法监听目录变化:', e.message);
+    console.warn(`⚠ 无法监听 ${dir}:`, e.message);
   }
+}
+function startWatchers() {
+  stopWatchers();
+  if (!APC_ROOT && !APC_DIR) {
+    console.warn('⚠ 无可监听目录');
+    return;
+  }
+  watchDir(APC_ROOT);
+  if (APC_DIR && APC_DIR !== APC_ROOT) watchDir(APC_DIR);
+  console.log('  ✓ 目录监听已启用: ' + [APC_ROOT, APC_DIR].filter(Boolean).join(', '));
 }
 
 /* ---------- 请求体解析 ---------- */
@@ -336,29 +406,31 @@ const server = http.createServer(async (req, res) => {
     const dirs = scanApcDirs();
     sendJSON(res, 200, {
       dirs,
-      current: APC_DIR
+      current: APC_DIR || APC_ROOT
     });
     return;
   }
 
-  // API：切换当前知识库目录
+  // API：切换当前知识库目录（可为项目根目录或 .apc 目录）
   if (p === '/api/dirs/select' && req.method === 'POST') {
     try {
       const body = await readBody(req);
       const data = JSON.parse(body || '{}');
-      const target = resolveApcPath(data.path);
-      if (!target) {
-        sendJSON(res, 400, { error: '目录不存在或不是有效知识库（需包含 .apc）', input: data.path });
+      const proj = resolveProject(data.path);
+      if (!proj || !proj.root) {
+        sendJSON(res, 400, { error: '目录不存在或无效', input: data.path });
         return;
       }
-      APC_DIR = target;
+      APC_ROOT = proj.root;
+      APC_DIR = proj.apcDir;
       // 记录到自定义目录（若不在扫描范围内）
-      if (!scanApcDirs().some(d => d.path === target)) {
-        if (!customDirs.includes(target)) customDirs.push(target);
+      const key = APC_DIR || APC_ROOT;
+      if (!scanApcDirs().some(d => d.path === key) && !customDirs.includes(key)) {
+        customDirs.push(key);
       }
       saveConfig();
-      startWatcher();
-      sendJSON(res, 200, { ok: true, dir: APC_DIR });
+      startWatchers();
+      sendJSON(res, 200, { ok: true, dir: APC_DIR || APC_ROOT });
     } catch (e) {
       sendJSON(res, 400, { error: e.message });
     }
@@ -368,7 +440,8 @@ const server = http.createServer(async (req, res) => {
   // API：元数据 + 结构图
   if (p === '/api/meta') {
     sendJSON(res, 200, {
-      dir: APC_DIR,
+      root: APC_ROOT,
+      dir: APC_DIR || APC_ROOT,
       files: buildFiles(),
       graph: buildGraph(),
       trust: TRUST
@@ -443,9 +516,11 @@ const server = http.createServer(async (req, res) => {
 
 /* ---------- 启动 ---------- */
 loadCustomDirs();
-APC_DIR = defaultApcDir();
+const _proj = defaultProject();
+APC_ROOT = _proj.root;
+APC_DIR = _proj.apcDir;
 checkEnvironment();
-startWatcher();
+startWatchers();
 
 server.listen(PORT, () => {
   console.log(`\n  ➜  http://localhost:${PORT}`);

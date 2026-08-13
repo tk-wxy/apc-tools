@@ -22,30 +22,23 @@
   let editing = false;
   let sseReconnectTimer = null;
   let metaLoadFailed = false;
+  let suppressSSEUntil = 0;   // 保存后短暂抑制 SSE 刷新，避免重复渲染
+  let loadToken = 0;          // selectFile 请求令牌，防止快速切换时加载态错乱
   /* 单一数据源：当前正在编辑的原始 Markdown 文本。
      右侧编辑框与左侧预览都只是这份数据的两个视图。 */
   let draftContent = '';
-  /* diff 状态：进入编辑时的基准内容、上次 diff 指纹、光标行、闪烁/滚动控制 */
-  let baseContent = '';
-  let lastDiffKey = '';
-  let lastCursorLine = 0;
-  let lastDiffScrollAt = 0;
-  let flashTimer = null;
-  let cursorScrollTimer = null;
 
-  /* 全局状态横幅 */
+  /* 全局状态横幅（固定层 toast，显示/隐藏不引发布局重排） */
   const banner = document.createElement('div');
   banner.className = 'status-banner';
-  banner.style.display = 'none';
   document.body.prepend(banner);
 
   function showBanner(type, msg) {
-    banner.className = 'status-banner ' + type;
+    banner.className = 'status-banner ' + type + ' show';
     banner.innerHTML = msg;
-    banner.style.display = 'block';
   }
   function hideBanner() {
-    banner.style.display = 'none';
+    banner.classList.remove('show');
   }
 
   function trustLabel(t) {
@@ -149,11 +142,7 @@
     // 全屏编辑模式：隐藏左右面板，编辑分屏占满视口
     document.body.classList.toggle('editing', on);
     if (!on && currentId) {
-      // 退出编辑后重置 diff 状态
-      baseContent = '';
-      lastDiffKey = '';
-      lastCursorLine = 0;
-      // 回显渲染内容（若已保存则为成品，若取消则重新拉取原内容）
+      // 退出编辑后回显渲染内容（若已保存则为成品，若取消则重新拉取原内容）
       selectFile(currentId);
     }
   }
@@ -183,8 +172,10 @@
       `<span class="m-item"><button class="btn btn-ghost edit-btn" id="edit-btn" title="编辑此文件">✏️ 编辑</button></span>`;
     headerEl.appendChild(meta);
 
-    // 从 API 拉取内容
-    bodyEl.innerHTML = '<p style="color:var(--muted)">加载中…</p>';
+    // 拉取内容：保留旧内容（避免「加载中」占位闪烁与高度跳动），仅慢响应时才淡出标记加载态
+    const contentPanel = document.querySelector('.content-panel');
+    const myToken = ++loadToken;
+    let loadingTimer = setTimeout(() => contentPanel.classList.add('loading'), 120);
     try {
       const res = await fetch(`/api/content?id=${encodeURIComponent(id)}`);
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -206,6 +197,9 @@
           `<div class="empty-state"><p>⚠ 无法加载 ${file.name}</p>` +
           `<p class="sub">${e.message} · 请确认文件存在且服务器可读</p></div>`;
       }
+    } finally {
+      clearTimeout(loadingTimer);
+      if (myToken === loadToken) contentPanel.classList.remove('loading');
     }
 
     // 高亮激活节点
@@ -214,175 +208,27 @@
     });
   }
 
-  /* 行级 diff（LCS + 相似度启发式）：
-     返回数组，长度 = 新文本行数，取值 null（未变更）| 'added'（新增）| 'modified'（修改）。
-     文件过大时返回 null 表示跳过标注。 */
-  function lineDiff(oldText, newText) {
-    const a = oldText.split('\n');
-    const b = newText.split('\n');
-    const n = a.length, m = b.length;
-
-    // 性能保护：行数乘积过大时跳过精确 diff
-    if (n * m > 250000) return null;
-
-    const res = new Array(m).fill(null);
-
-    // 前后缀公共行裁剪，缩小 DP 规模
-    let pre = 0;
-    while (pre < n && pre < m && a[pre] === b[pre]) pre++;
-    let suf = 0;
-    while (suf < n - pre && suf < m - pre && a[n - 1 - suf] === b[m - 1 - suf]) suf++;
-
-    const aMid = a.slice(pre, n - suf);
-    const bMid = b.slice(pre, m - suf);
-    const nn = aMid.length, mm = bMid.length;
-
-    const bMatched = new Array(mm).fill(false);
-    const aUsed = new Array(nn).fill(false);
-
-    if (nn && mm) {
-      // LCS DP
-      const dp = new Array(nn + 1);
-      for (let i = 0; i <= nn; i++) dp[i] = new Array(mm + 1).fill(0);
-      for (let i = nn - 1; i >= 0; i--) {
-        for (let j = mm - 1; j >= 0; j--) {
-          dp[i][j] = aMid[i] === bMid[j]
-            ? dp[i + 1][j + 1] + 1
-            : Math.max(dp[i + 1][j], dp[i][j + 1]);
-        }
-      }
-      // 回溯标记匹配行
-      let i = 0, j = 0;
-      while (i < nn && j < mm) {
-        if (aMid[i] === bMid[j]) { bMatched[j] = true; aUsed[i] = true; i++; j++; }
-        else if (dp[i + 1][j] >= dp[i][j + 1]) i++;
-        else j++;
-      }
-    }
-
-    // 相似度启发式：未匹配的新行找最相似的未匹配旧行（1:1 替换 → modified）
-    const unmatchedA = new Set();
-    for (let i = 0; i < nn; i++) if (!aUsed[i]) unmatchedA.add(i);
-    const bSim = new Array(mm).fill(false);
-    for (let j = 0; j < mm; j++) {
-      if (bMatched[j]) continue;
-      let bestI = -1, bestSim = 0.6;
-      for (const i of unmatchedA) {
-        const s = lineSimilarity(aMid[i], bMid[j]);
-        if (s > bestSim) { bestSim = s; bestI = i; }
-      }
-      if (bestI >= 0) { bSim[j] = true; unmatchedA.delete(bestI); }
-    }
-
-    // 组装结果
-    for (let j = 0; j < pre; j++) res[j] = null;
-    for (let j = 0; j < mm; j++) {
-      res[pre + j] = bMatched[j] ? null : (bSim[j] ? 'modified' : 'added');
-    }
-    for (let j = 0; j < suf; j++) res[m - suf + j] = null;
-    return res;
-  }
-
-  /* 字符级相似度（用于判断“修改” vs “新增”） */
-  function lineSimilarity(x, y) {
-    if (!x.length || !y.length) return 0;
-    const sx = new Set(x), sy = new Set(y);
-    let common = 0;
-    for (const ch of sx) if (sy.has(ch)) common++;
-    return common / Math.min(sx.size, sy.size);
-  }
-
-  /* 当前光标所在行（1-based） */
-  function cursorLine() {
-    const pos = editorEl.selectionStart;
-    return editorEl.value.slice(0, pos).split('\n').length;
-  }
-
-  /* 滚动预览到指定源行：找到 data-src-line >= 目标行的最近块 */
-  function scrollPreviewToLine(lineNo, smooth, flash) {
-    if (!lineNo) return;
-    const blocks = editorPreviewEl.querySelectorAll('[data-src-line]');
-    if (!blocks.length) return;
-    let target = blocks[0];
-    for (const b of blocks) {
-      if (parseInt(b.dataset.srcLine, 10) >= lineNo) { target = b; break; }
-      target = b;
-    }
-    target.scrollIntoView({ block: 'center', behavior: smooth ? 'smooth' : 'auto' });
-    if (flash) {
-      if (flashTimer) clearTimeout(flashTimer);
-      target.classList.remove('diff-flash-target');
-      void target.offsetWidth; // 重启动画
-      target.classList.add('diff-flash-target');
-      flashTimer = setTimeout(() => target.classList.remove('diff-flash-target'), 1000);
-    }
-  }
-
-  /* 光标移动：定位预览到光标行（防抖 + 避免与 diff 滚动冲突） */
-  function onEditorCursorMove() {
-    const line = cursorLine();
-    if (line === lastCursorLine) return;
-    lastCursorLine = line;
-    if (cursorScrollTimer) clearTimeout(cursorScrollTimer);
-    cursorScrollTimer = setTimeout(() => {
-      if (Date.now() - lastDiffScrollAt < 250) return;
-      scrollPreviewToLine(line, true, false);
-    }, 120);
-  }
-
-  /* 渲染 Markdown 到预览区：直接读取单一数据源 draftContent，并标注本次变更行 */
+  /* 渲染 Markdown 到预览区：直接读取单一数据源 draftContent */
   function updatePreview() {
     const text = draftContent || '';
     const trimmed = text.trim();
-    let diffLines = null;
-    let changeCount = 0;
-    let diffTooBig = false;
-
-    if (editing) {
-      const r = lineDiff(baseContent, text);
-      if (r === null) diffTooBig = true;
-      else {
-        diffLines = r;
-        changeCount = r.filter(x => x).length;
-      }
-    }
-
-    const diffKey = diffLines ? diffLines.join('|') : '';
-    const diffChanged = diffKey !== lastDiffKey;
-    lastDiffKey = diffKey;
-
     editorPreviewEl.innerHTML = trimmed
-      ? renderMarkdown(text, { diffLines })
+      ? renderMarkdown(text)
       : '<div class="empty-state"><p>📝 草稿为空</p><p class="sub">在右侧输入 Markdown 后，此处实时预览成品效果</p></div>';
-
-    // 状态栏：变更行计数
-    const fname = editorFileNameEl.textContent || '';
-    if (diffTooBig) {
-      editorStatusEl.textContent = `编辑模式 · 文件较大，已跳过变更标注`;
-    } else if (changeCount > 0) {
-      editorStatusEl.textContent = `编辑模式 · 本次变更 ${changeCount} 行 · 保存将覆盖 ${fname} 完整内容`;
-    } else {
-      editorStatusEl.textContent = `编辑模式 · 暂无变更 · 保存将覆盖 ${fname} 完整内容`;
-    }
-
     // 字数统计（中英文混合计数）
     const chars = trimmed ? text.replace(/\s/g, '').length : 0;
     editorCharsEl.textContent = `${chars} 字 · ${text.length} 字符`;
-    return diffChanged;
   }
 
   /* 进入编辑模式：
      1) 把已保存的原始内容立即赋给单一数据源 draftContent（绝不留空）
-     2) 记录基准内容 baseContent 用于 diff
-     3) 右侧编辑框只是 draftContent 的视图，同步 value
-     4) 左侧预览直接读 draftContent，立刻渲染 */
+     2) 右侧编辑框只是 draftContent 的视图，同步 value
+     3) 左侧预览直接读 draftContent，立刻渲染 */
   function enterEditMode(file, content) {
     draftContent = content || '';
-    baseContent = draftContent;
-    lastDiffKey = '';
-    lastCursorLine = 0;
     editorEl.value = draftContent;
     editorFileNameEl.textContent = file.name;
+    editorStatusEl.textContent = `编辑模式 · 保存将覆盖 ${file.name} 完整内容`;
     setEditing(true);
     updatePreview();
     editorEl.focus();
@@ -396,6 +242,8 @@
     saveBtn.disabled = true;
     saveBtn.textContent = '保存中…';
     try {
+      // 先抑制 SSE：服务端写入后会广播 files-changed，避免与本端刷新重复
+      suppressSSEUntil = Date.now() + 1500;
       const res = await fetch('/api/content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -405,16 +253,14 @@
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || ('HTTP ' + res.status));
       }
-      setEditing(false);
+      // 保存不改变文件列表，无需 loadMeta；退出编辑即可重渲染正文（已含新内容）
       const fname = FILES.find(f => f.id === currentId)?.name || '';
+      setEditing(false);
       showBanner('info', `✓ 已覆盖保存 ${fname}，成品已更新`);
-      // 触发重新加载（SSE 也会收到，但这里主动刷新避免等待）
-      setTimeout(() => {
-        hideBanner();
-        loadMeta();
-      }, 300);
+      setTimeout(hideBanner, 1200);
     } catch (e) {
       showBanner('error', `⚠ 保存失败：${e.message}`);
+      setTimeout(hideBanner, 3000);
     } finally {
       saveBtn.disabled = false;
       saveBtn.textContent = oldText;
@@ -603,18 +449,12 @@
       else hideBanner();
     };
 
-    es.addEventListener('files-changed', (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        console.log(`[SSE] 文件变化: ${data.file}，重新加载元数据…`);
-        // 编辑模式下不打断用户输入
-        if (!editing) {
-          showBanner('info', `↻ 检测到 ${data.file} 变化，正在刷新…`);
-          loadMeta();
-        }
-      } catch (err) {
-        console.error('SSE 消息解析失败:', err);
-      }
+    es.addEventListener('files-changed', () => {
+      // 编辑中、或本端保存刚触发的变化：不重复刷新
+      if (editing) return;
+      if (Date.now() < suppressSSEUntil) return;
+      console.log('[SSE] 文件变化，刷新元数据');
+      loadMeta();
     });
 
     es.onerror = () => {
@@ -634,11 +474,15 @@
 
   /* 面板折叠 */
   function setupCollapse() {
+    const layout = document.querySelector('.layout');
     document.querySelectorAll('.collapse-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const panel = document.getElementById(btn.dataset.panel);
-        const layout = document.querySelector('.layout');
         if (!panel) return;
+
+        // 清理上次展开过渡残留的监听/兜底
+        if (panel._reveal) layout.removeEventListener('transitionend', panel._reveal);
+        if (panel._fallback) clearTimeout(panel._fallback);
 
         const collapsed = panel.classList.toggle('collapsed');
         btn.textContent = collapsed ? '+' : '−';
@@ -648,6 +492,24 @@
           layout.classList.toggle('collapse-structure', collapsed);
         } else if (panel.id === 'tree-panel') {
           layout.classList.toggle('collapse-tree', collapsed);
+        }
+
+        // 展开：宽度过渡期间隐藏正文，避免窄宽度下文件列表/结构图回流换行
+        if (!collapsed) {
+          panel.classList.add('expanding');
+          panel._reveal = (e) => {
+            if (e.target !== layout || e.propertyName !== 'grid-template-columns') return;
+            panel.classList.remove('expanding');
+            layout.removeEventListener('transitionend', panel._reveal);
+            clearTimeout(panel._fallback);
+            panel._reveal = panel._fallback = null;
+          };
+          panel._fallback = setTimeout(() => {
+            panel.classList.remove('expanding');
+            layout.removeEventListener('transitionend', panel._reveal);
+            panel._reveal = panel._fallback = null;
+          }, 320);
+          layout.addEventListener('transitionend', panel._reveal);
         }
       });
     });
@@ -715,19 +577,8 @@
   // 每次按键：新值立即写回单一数据源 draftContent，再立即重渲染预览（无防抖/节流）
   editorEl.addEventListener('input', () => {
     draftContent = editorEl.value;
-    const diffChanged = updatePreview();
-    // diff 有变化：滚动预览到第一个变更块并闪烁提示
-    if (diffChanged) {
-      const first = editorPreviewEl.querySelector('.diff-added, .diff-modified');
-      if (first) {
-        lastDiffScrollAt = Date.now();
-        scrollPreviewToLine(parseInt(first.dataset.srcLine, 10), true, true);
-      }
-    }
+    updatePreview();
   });
-  // 光标移动（键盘/鼠标）：定位预览到光标所在行
-  editorEl.addEventListener('keyup', onEditorCursorMove);
-  editorEl.addEventListener('click', onEditorCursorMove);
   editorSaveBtn.addEventListener('click', saveEdit);
   editorCancelBtn.addEventListener('click', () => {
     setEditing(false);

@@ -176,11 +176,25 @@ body {
 
 /* ===== 状态横幅 ===== */
 .status-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
   padding: 10px 20px;
   font-size: 13px;
   line-height: 1.6;
-  flex-shrink: 0;
   border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 8px var(--overlay-bg);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-100%);
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+}
+.status-banner.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 .status-banner .sub { opacity: 0.8; font-size: 12px; }
 .status-banner.info { background: var(--banner-info-bg); color: var(--banner-info-fg); }
@@ -348,6 +362,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 14px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
@@ -356,6 +371,11 @@ body {
   margin-bottom: 0;
   padding-bottom: 0;
   border-bottom: none;
+  /* 展开过渡期间面板尚窄，禁止标题换行/溢出，避免"流出来"的回流效果 */
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .collapse-btn {
   background: none;
@@ -379,6 +399,12 @@ body {
 }
 .panel-body {
   display: block;
+  transition: opacity 0.15s ease;
+}
+/* 展开过渡期间隐藏正文：宽度稳定后再淡入，避免窄宽度下内容回流换行 */
+.panel.expanding .panel-body {
+  opacity: 0;
+  pointer-events: none;
 }
 .panel.collapsed .panel-body {
   display: none;
@@ -786,7 +812,9 @@ body {
 
 .content-panel { display: flex; flex-direction: column; }
 .content-panel .content-header { flex-shrink: 0; }
-.content-panel .content-body { flex: 1; overflow-y: auto; min-height: 0; }
+.content-panel .content-body { flex: 1; overflow-y: auto; min-height: 0; transition: opacity 0.12s ease; }
+/* 慢响应加载态：淡出正文，避免「加载中」占位造成的高度跳动/闪烁 */
+.content-panel.loading .content-body { opacity: 0.4; pointer-events: none; }
 
 /* ===== 全屏编辑模式 ===== */
 /* 进入编辑时：隐藏左右面板，编辑分屏占满整个视口宽度 */
