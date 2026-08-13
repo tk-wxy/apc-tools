@@ -59,6 +59,13 @@
 
   /* 弹层 */
   --overlay-bg: rgba(0, 0, 0, 0.4);
+
+  /* 编辑 diff 标注 */
+  --diff-added-bg: #dcfce7;
+  --diff-added-border: #4ade80;
+  --diff-modified-bg: #fef9c3;
+  --diff-modified-border: #facc15;
+  --diff-flash-ring: rgba(79, 70, 229, 0.35);
 }
 
 /* ===== 主题变量：深色（显式） ===== */
@@ -100,6 +107,12 @@
   --scrollbar-thumb-hover: #6b7280;
 
   --overlay-bg: rgba(0, 0, 0, 0.6);
+
+  --diff-added-bg: #14532d;
+  --diff-added-border: #4ade80;
+  --diff-modified-bg: #4a3a12;
+  --diff-modified-border: #facc15;
+  --diff-flash-ring: rgba(129, 140, 248, 0.5);
 }
 
 /* ===== 主题变量：系统跟随 ===== */
@@ -141,7 +154,13 @@
     --scrollbar-thumb: #4b5563;
     --scrollbar-thumb-hover: #6b7280;
 
-    --overlay-bg: rgba(0, 0, 0, 0.6);
+  --overlay-bg: rgba(0, 0, 0, 0.6);
+
+  --diff-added-bg: #14532d;
+  --diff-added-border: #4ade80;
+  --diff-modified-bg: #4a3a12;
+  --diff-modified-border: #facc15;
+  --diff-flash-ring: rgba(129, 140, 248, 0.5);
   }
 }
 
@@ -670,6 +689,42 @@ body {
   background: var(--panel);
 }
 .editor-preview .empty-state { padding: 20px; }
+
+/* ===== 编辑 diff 标注 ===== */
+.editor-preview .diff-added {
+  background: var(--diff-added-bg);
+  box-shadow: inset 3px 0 0 var(--diff-added-border);
+  border-radius: 2px;
+}
+.editor-preview .diff-modified {
+  background: var(--diff-modified-bg);
+  box-shadow: inset 3px 0 0 var(--diff-modified-border);
+  border-radius: 2px;
+}
+/* 整块容器（代码块）时，仅显示左侧色条避免大块变色干扰阅读 */
+.editor-preview pre.diff-added,
+.editor-preview pre.diff-modified,
+.editor-preview blockquote.diff-added,
+.editor-preview blockquote.diff-modified {
+  background: transparent;
+  box-shadow: none;
+  border-left: 4px solid;
+}
+.editor-preview pre.diff-added,
+.editor-preview pre.diff-modified { border-left-color: var(--diff-added-border); }
+.editor-preview pre.diff-modified { border-left-color: var(--diff-modified-border); }
+.editor-preview blockquote.diff-added { border-left-color: var(--diff-added-border); }
+.editor-preview blockquote.diff-modified { border-left-color: var(--diff-modified-border); }
+
+/* 变更块闪烁提示（刚变更时定位） */
+.diff-flash-target {
+  animation: diff-flash 1s ease;
+}
+@keyframes diff-flash {
+  0%   { box-shadow: 0 0 0 0 var(--diff-flash-ring); }
+  50%  { box-shadow: 0 0 0 6px var(--diff-flash-ring); }
+  100% { box-shadow: 0 0 0 0 var(--diff-flash-ring); }
+}
 
 .editor {
   display: block;

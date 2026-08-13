@@ -22,11 +22,31 @@ function renderInline(text) {
   return html;
 }
 
-function renderMarkdown(md) {
+/* 生成「源行号 + 变更标注」属性串。
+   diffLines[i] 取值：null（未变更）| 'added'（新增）| 'modified'（修改）。
+   块级元素跨多行时（代码块），任一行变更则整块标注。 */
+function srcAttr(lineNo, diffLines, startLine, endLine) {
+  if (!diffLines) return ` data-src-line="${lineNo}"`;
+  const s = startLine == null ? lineNo : startLine;
+  const e = endLine == null ? lineNo : endLine;
+  let hasAdded = false, hasModified = false;
+  for (let i = s; i <= e; i++) {
+    if (diffLines[i] === 'added') hasAdded = true;
+    else if (diffLines[i] === 'modified') hasModified = true;
+  }
+  let cls = '';
+  if (hasModified) cls = 'diff-modified';
+  else if (hasAdded) cls = 'diff-added';
+  return ` data-src-line="${lineNo}"` + (cls ? ` class="${cls}"` : '');
+}
+
+function renderMarkdown(md, options) {
+  const diffLines = options && options.diffLines;
   const lines = md.split('\n');
   let html = '';
   let inCode = false;
   let codeBuffer = [];
+  let codeStartLine = 0;
   let inUl = false;
   let inOl = false;
   let inTable = false;
@@ -42,10 +62,10 @@ function renderMarkdown(md) {
     if (line.trim().startsWith('```')) {
       closeUl(); closeOl(); closeTable();
       if (!inCode) {
-        inCode = true; codeBuffer = [];
+        inCode = true; codeBuffer = []; codeStartLine = i;
       } else {
         inCode = false;
-        html += `<pre><code>${escapeHtml(codeBuffer.join('\n'))}</code></pre>\n`;
+        html += `<pre${srcAttr(codeStartLine, diffLines, codeStartLine, i)}><code>${escapeHtml(codeBuffer.join('\n'))}</code></pre>\n`;
       }
       continue;
     }
@@ -62,7 +82,7 @@ function renderMarkdown(md) {
     // 表格（当前处于表格中）
     if (inTable && trimmed.startsWith('|')) {
       const cells = trimmed.split('|').slice(1, -1);
-      html += '<tr>' + cells.map(c => `<td>${highlightPlaceholders(renderInline(c))}</td>`).join('') + '</tr>\n';
+      html += `<tr${srcAttr(i, diffLines)}>` + cells.map(c => `<td>${highlightPlaceholders(renderInline(c))}</td>`).join('') + '</tr>\n';
       continue;
     }
 
@@ -70,7 +90,7 @@ function renderMarkdown(md) {
     if (trimmed.startsWith('|') && i + 1 < lines.length && /^\|[\s\-:|]+\|?$/.test(lines[i + 1].trim())) {
       closeUl(); closeOl(); closeTable();
       const headerCells = trimmed.split('|').slice(1, -1);
-      html += '<table><thead><tr>' +
+      html += `<table><thead><tr${srcAttr(i, diffLines)}>` +
         headerCells.map(c => `<th>${highlightPlaceholders(renderInline(c))}</th>`).join('') +
         '</tr></thead><tbody>\n';
       inTable = true;
@@ -83,7 +103,7 @@ function renderMarkdown(md) {
     if (h) {
       closeUl(); closeOl(); closeTable();
       const level = h[1].length;
-      html += `<h${level}>${highlightPlaceholders(renderInline(h[2]))}</h${level}>\n`;
+      html += `<h${level}${srcAttr(i, diffLines)}>${highlightPlaceholders(renderInline(h[2]))}</h${level}>\n`;
       continue;
     }
 
@@ -91,7 +111,7 @@ function renderMarkdown(md) {
     if (trimmed.startsWith('>')) {
       closeUl(); closeOl(); closeTable();
       const quoteText = trimmed.replace(/^>\s?/, '');
-      html += `<blockquote>${highlightPlaceholders(renderInline(quoteText))}</blockquote>\n`;
+      html += `<blockquote${srcAttr(i, diffLines)}>${highlightPlaceholders(renderInline(quoteText))}</blockquote>\n`;
       continue;
     }
 
@@ -103,7 +123,7 @@ function renderMarkdown(md) {
       const subMatch = trimmed.match(/^(\s*)[-*+]\s+(.*)$/);
       const indent = subMatch ? subMatch[1].length : 0;
       const content = indent > 0 ? subMatch[2] : itemText;
-      html += `<li>${highlightPlaceholders(renderInline(content))}</li>\n`;
+      html += `<li${srcAttr(i, diffLines)}>${highlightPlaceholders(renderInline(content))}</li>\n`;
       continue;
     }
 
@@ -112,24 +132,24 @@ function renderMarkdown(md) {
       closeUl(); closeTable();
       if (!inOl) { html += '<ol>\n'; inOl = true; }
       const content = trimmed.replace(/^\d+\.\s+/, '');
-      html += `<li>${highlightPlaceholders(renderInline(content))}</li>\n`;
+      html += `<li${srcAttr(i, diffLines)}>${highlightPlaceholders(renderInline(content))}</li>\n`;
       continue;
     }
 
     // 水平线
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
       closeUl(); closeOl(); closeTable();
-      html += '<hr>\n';
+      html += `<hr${srcAttr(i, diffLines)}>\n`;
       continue;
     }
 
     // 普通段落
     closeUl(); closeOl(); closeTable();
-    html += `<p>${highlightPlaceholders(renderInline(trimmed))}</p>\n`;
+    html += `<p${srcAttr(i, diffLines)}>${highlightPlaceholders(renderInline(trimmed))}</p>\n`;
   }
 
   closeUl(); closeOl(); closeTable();
-  if (inCode) { html += `<pre><code>${escapeHtml(codeBuffer.join('\n'))}</code></pre>\n`; }
+  if (inCode) { html += `<pre${srcAttr(codeStartLine, diffLines, codeStartLine, lines.length - 1)}><code>${escapeHtml(codeBuffer.join('\n'))}</code></pre>\n`; }
 
   return html;
 }
